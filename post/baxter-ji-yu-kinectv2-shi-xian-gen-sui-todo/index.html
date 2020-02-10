@@ -1,0 +1,276 @@
+
+<!DOCTYPE html>
+<html>
+  <head>
+    
+<meta charset="utf-8" >
+
+<title>Baxter 基于KinectV2实现跟随(Todo) | kkkkkaiai</title>
+<meta name="description" content="for life">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/3.7.0/animate.min.css">
+
+<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.7.2/css/all.css" integrity="sha384-fnmOCqbTlWIlj8LyTjo7mOUStjsKC4pOpQbqyi7RrhN7udi9RwhKkMHpvLbHG9Sr" crossorigin="anonymous">
+<link rel="shortcut icon" href="https://kkkkkaiai.github.io/favicon.ico?v=1581344095623">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.10.0/katex.min.css">
+<link rel="stylesheet" href="https://kkkkkaiai.github.io/styles/main.css">
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+<script src="https://cdn.bootcss.com/highlight.js/9.12.0/highlight.min.js"></script>
+
+
+
+  </head>
+  <body>
+    <div id="app" class="main">
+      <div class="site-header-container">
+  <div class="site-header">
+    <div class="left">
+      <a href="https://kkkkkaiai.github.io">
+        <img class="avatar" src="https://kkkkkaiai.github.io/images/avatar.png?v=1581344095623" alt="" width="32px" height="32px">
+      </a>
+      <a href="https://kkkkkaiai.github.io">
+        <h1 class="site-title">kkkkkaiai</h1>
+      </a>
+    </div>
+    <div class="right">
+      <transition name="fade">
+        <i class="icon" :class="{ 'icon-close-outline': menuVisible, 'icon-menu-outline': !menuVisible }" @click="menuVisible = !menuVisible"></i>
+      </transition>
+    </div>
+  </div>
+</div>
+
+<transition name="fade">
+  <div class="menu-container" style="display: none;" v-show="menuVisible">
+    <div class="menu-list">
+      
+        
+          <a href="/" class="menu purple-link">
+            首页
+          </a>
+        
+      
+        
+          <a href="/archives" class="menu purple-link">
+            归档
+          </a>
+        
+      
+        
+          <a href="/tags" class="menu purple-link">
+            标签
+          </a>
+        
+      
+        
+          <a href="/post/about" class="menu purple-link">
+            关于
+          </a>
+        
+      
+    </div>
+  </div>
+</transition>
+
+
+      <div class="content-container">
+        <div class="post-detail">
+          
+          <h2 class="post-title">Baxter 基于KinectV2实现跟随(Todo)</h2>
+          <div class="post-info post-detail-info">
+            <span><i class="icon-calendar-outline"></i> 2020-02-10</span>
+            
+          </div>
+          <div class="post-content">
+            <h1 id="平台环境">平台环境</h1>
+<p>系统环境：Ubuntu 16.04 及 Ubuntu 14.04<br>
+摄像头：KinectV2<br>
+安装的库: OpenNI2, NiTE2, NiViewer2<br>
+实现功能需要的包：kinect2_tracker</p>
+<h2 id="一键式安装环境">一键式安装环境</h2>
+<pre><code class="language-powershell">sudo apt-get install build-essential cmake pkg-config \
+libusb-1.0-0-dev \
+libturbojpeg libjpeg-turbo8-dev \
+libopenni2-dev
+</code></pre>
+<p>Ubuntu16.04执行一下指令</p>
+<pre><code class="language-bash">sudo apt install libglfw3-dev 
+</code></pre>
+<p>以上分别安装了:</p>
+<ol>
+<li>编译工具</li>
+<li>libusb</li>
+<li>TurboJPEG</li>
+<li>OpenNI2</li>
+<li>OpenGL(16.04下的,  4.04的会在libfreenect2的教程中安装)</li>
+</ol>
+<h2 id="安装libfreenect2">安装libfreenect2</h2>
+<p>clone下<a href="https://github.com/OpenKinect/libfreenect2">libfreenect2</a>的驱动，编译并安装。</p>
+<h3 id="ubuntu1404">Ubuntu14.04</h3>
+<pre><code class="language-bash">git clone https://github.com/OpenKinect/libfreenect2.git
+cd libfreenect2
+cd depends; ./download_debs_trusty.sh
+sudo dpkg -i debs/libusb*deb
+sudo dpkg -i debs/libglfw3*deb; sudo apt-get install -f
+cd ../
+mkdir build &amp;&amp; cd build
+cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/freenect2
+make
+make install
+</code></pre>
+<h3 id="ubuntu1604">Ubuntu16.04</h3>
+<pre><code class="language-bash">git clone https://github.com/OpenKinect/libfreenect2.git
+cd libfreenect2  
+sudo mkdir build &amp;&amp; cd build
+sudo cmake .. -DCMAKE_INSTALL_PREFIX=$HOME/freenect2
+sudo make
+sudo make install
+</code></pre>
+<p>获取设备权限</p>
+<pre><code class="language-bash">cd ~/libfreenect2
+sudo cp platform/linux/udev/90-kinect2.rules /etc/udev/rules.d/
+</code></pre>
+<p>测试运行</p>
+<pre><code class="language-bash">cd build/bin
+./Protonect pl
+./Protonect cl
+./Protonect cpu
+</code></pre>
+<h2 id="ros接口安装">ROS接口安装</h2>
+<p>建立一个工作空间，并安装<a href="https://github.com/code-iai/iai_kinect2">iai_kinect2</a></p>
+<pre><code class="language-bash">mkdir -p ~/catkin_ws/src/ 
+cd ~/catkin_ws/src/
+git clone https://github.com/code-iai/iai_kinect2.git
+cd iai_kinect2
+rosdep install -r --from-paths .
+cd ~/catkin_ws
+catkin_make -DCMAKE_BUILD_TYPE=&quot;Release&quot;
+</code></pre>
+<p>测试接口是否可用</p>
+<pre><code class="language-bash">roslaunch kinect2_bridge kinect2_bridge.launch
+</code></pre>
+<p>启动新的终端</p>
+<pre><code class="language-bash">rosrun kinect2_viewer kinect2_viewer
+rosrun kinect2_viewer kinect2_viewer sd cloud
+</code></pre>
+<h2 id="安装niviewer2">安装NiViewer2</h2>
+<pre><code class="language-bash">cd ~/libfreenect2/build
+sudo apt-get install openni2-utils
+sudo cmake ..
+sudo make &amp;&amp; sudo make install 
+sudo make install openni2
+NiViewer2
+</code></pre>
+<p>发现无法打开</p>
+<pre><code class="language-bash">cd ~/freenect2/lib/OpenNI2/Drivers
+sudo cp libfreenect2-openni2.so* /usr/lib/OpenNI2/Drivers/
+NiViewer2
+</code></pre>
+<p>然后就可以打开了</p>
+<h2 id="nite2安装">NiTE2安装</h2>
+<p>下载<a href="https://zh.osdn.net/frs/g_redir.php?m=kent&amp;f=roboticslab%2FExternal%2Fnite%2FNiTE-Linux-x64-2.2.tar.bz2">NiTE2</a></p>
+<pre><code class="language-bash">mkdir -p ~/package_ws
+</code></pre>
+<p><em><strong>在本教程中一定要在此文件夹(package_ws)下，如果实在不想，请参考原github地址，修改相关文件。</strong></em></p>
+<p>把下载好的包解压到此文件夹的目录下</p>
+<pre><code class="language-bash">cd NiTE-Linux-x64-2.2
+sudo ./install.sh
+cat NiTEDevEnvironment &gt;&gt; ~/.bashrc
+</code></pre>
+<p>添加环境变量，在.bashrc下会有两条路径信息</p>
+<blockquote>
+<p>export NITE2_INCLUDE=/home/HOST_NAME/package_ws/NiTE-2.0.0/Include<br>
+export NITE2_REDIST64=/home/HOST_NAME/package_ws/NiTE-2.0.0/Redist</p>
+</blockquote>
+<p>修改OpenNI.ini文件</p>
+<pre><code class="language-bash">cd Samples/Bin
+sudo gedit OpenNI.ini
+</code></pre>
+<p>添加路径信息</p>
+<blockquote>
+<p>Repository=/usr/lib/OpenNI2/Drivers</p>
+</blockquote>
+<p>在终端下运行</p>
+<pre><code class="language-bash">./UserViewer
+</code></pre>
+<h2 id="下载测试kinect2_tracker包">下载测试kinect2_tracker包</h2>
+<h3 id="安装rbx1如果下载过就不用下载了">安装rbx1（如果下载过就不用下载了）</h3>
+<pre><code class="language-bash">cd ~/ros_ws/src
+git clone https://github.com/pirobot/rbx1.git
+</code></pre>
+<h3 id="安装kinect2_tracker">安装kinect2_tracker</h3>
+<p><a href="https://github.com/mcgi5sr2/kinect2_tracker">kinect2_tracker下载地址</a></p>
+<pre><code class="language-bash">cd ~/ros_ws/src
+git clone https://github.com/mcgi5sr2/kinect2_tracker.git
+cd kinect2_tracker
+</code></pre>
+<p>在source之前要修改setup_nite.bash中的内容<br>
+我将其改为了：</p>
+<blockquote>
+<p>ln -s ~/package_ws/NiTE-Linux-x64-2.2/Samples/Bin/NiTE2/ ~/.ros/NiTE2</p>
+</blockquote>
+<p>如果是原本的内容则显示无法找到相关文件</p>
+<pre><code class="language-bash">source setup_nite.bash
+cd ~/ros_ws
+catkin_make
+</code></pre>
+<p>kinect2_tracker安装已经完成<br>
+测试</p>
+<pre><code class="language-bash">roslaunch kinect2_tracker tracker.launch
+rosrun rviz rviz -d `rospack find rbx1_vision`/skeleton_frames.rviz
+</code></pre>
+<p>站到相机前，此时在rviz中可以看到关节点运动了</p>
+<h3 id="下载kinect_based_arm_tracking包">下载kinect_based_arm_tracking包</h3>
+<p><a href="https://github.com/birlrobotics/birl_baxter_demos/tree/master/kinect_based_arm_tracking">kinect_based_arm_tracking</a><br>
+[TODO]</p>
+
+          </div>
+        </div>
+
+        
+      </div>
+
+      
+
+      <div class="site-footer">
+  <div class="slogan">for life</div>
+  <div class="social-container">
+    
+      
+    
+      
+    
+      
+    
+      
+    
+      
+    
+  </div>
+  Powered by <a href="https://github.com/getgridea/gridea" target="_blank">Gridea</a> | <a class="rss" href="https://kkkkkaiai.github.io/atom.xml" target="_blank">RSS</a>
+</div>
+
+
+    </div>
+    <script type="application/javascript">
+
+hljs.initHighlightingOnLoad()
+
+var app = new Vue({
+  el: '#app',
+  data: {
+    menuVisible: false,
+  },
+})
+
+</script>
+
+
+
+
+  </body>
+</html>
